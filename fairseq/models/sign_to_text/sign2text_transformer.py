@@ -208,11 +208,8 @@ class Sign2TextTransformerEncoder(FairseqEncoder):
         self.padding_idx = 1
         
         self.feats_type = feats_type
-        if feats_type == SignFeatsType.mediapipe or feats_type == SignFeatsType.openpose:
-            self.feat_proj = nn.Linear(feat_dim * 3, cfg.encoder_embed_dim)
-        if feats_type == SignFeatsType.i3d:
-            self.feat_proj = nn.Linear(feat_dim, cfg.encoder_embed_dim)
-            
+        self.feat_proj = nn.Linear(63, cfg.encoder_embed_dim)
+
         self.embed_positions = PositionalEmbedding(
             cfg.max_source_positions, cfg.encoder_embed_dim, self.padding_idx
         )
@@ -226,8 +223,6 @@ class Sign2TextTransformerEncoder(FairseqEncoder):
             self.layer_norm = None
 
     def forward(self, src_tokens, encoder_padding_mask, return_all_hiddens=False):
-        if self.feats_type == SignFeatsType.mediapipe: #This error keeps appearing: raise AttributeError(name) from None
-            src_tokens = src_tokens.view(src_tokens.shape[0], src_tokens.shape[1], -1)
         #src_tokens B x seq_len x Fs
         x = self.feat_proj(src_tokens).transpose(0, 1) #[seq_len, batch_size, embed_dim]
         # x: seq_len x B x H
