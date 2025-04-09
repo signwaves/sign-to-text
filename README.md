@@ -43,3 +43,15 @@
 
 3. **Verification:**
    - Verify the quantized model to ensure it meets the desired size and performance requirements.
+
+## CLI Commands
+
+1. **Convert PyTorch Model to ONNX:**
+   ```bash
+   python convert_to_tflite.py
+   ```
+
+2. **Quantize the TFLite Model:**
+   ```bash
+   python quantize_model.py
+   ```
