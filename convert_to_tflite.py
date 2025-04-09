@@ -5,6 +5,7 @@ from fairseq.models.sign_to_text.sign2text_transformer import Sign2TextTransform
 from fairseq.dataclass.utils import convert_namespace_to_omegaconf
 from fairseq import checkpoint_utils, options, tasks
 import os, time
+import torch.onnx
 
 # Configuration
 checkpoint_path = "final_models/baseline_6_3_dp03_wd_2/ckpts/checkpoint.best_reduced_sacrebleu_3.5401.pt"  # Path to your trained PyTorch model checkpoint
@@ -37,58 +38,52 @@ state = checkpoint_utils.load_checkpoint_to_cpu(checkpoint_path)
 model.load_state_dict(state["model"], strict=True)
 model.eval()
 
+# --- 3. Convert PyTorch model to ONNX ---
+def convert_to_onnx(model, dummy_input, onnx_path):
+    torch.onnx.export(
+        model,
+        dummy_input,
+        onnx_path,
+        export_params=True,
+        opset_version=11,
+        do_constant_folding=True,
+        input_names=["input"],
+        output_names=["output"],
+        dynamic_axes={"input": {0: "batch_size", 1: "sequence_length"}, "output": {0: "batch_size", 1: "sequence_length"}},
+    )
 
-# --- 3. Adapt Model for TFLite (if needed) ---
-# In our case, we have already modified the model code in sign2text_transformer.py.
-# Further adaptations (like changing activation functions) can be done here if needed.
+# --- 4. Convert ONNX model to TFLite ---
+def convert_to_tflite(onnx_path, tflite_path):
+    import onnx
+    from onnx_tf.backend import prepare
 
+    # Load ONNX model
+    onnx_model = onnx.load(onnx_path)
 
-# --- 4. Create Dummy Input ---
+    # Convert ONNX model to TensorFlow
+    tf_rep = prepare(onnx_model)
+
+    # Convert TensorFlow model to TFLite with quantization
+    converter = tf.lite.TFLiteConverter.from_concrete_functions([tf_rep.tf_module.__call__.get_concrete_function()])
+    converter.optimizations = [tf.lite.Optimize.DEFAULT]
+    tflite_model = converter.convert()
+
+    # Save the TFLite model
+    with open(tflite_path, "wb") as f:
+        f.write(tflite_model)
+
+# --- 5. Create Dummy Input ---
 # Create a dummy input tensor with the correct shape (batch_size, sequence_length, feat_dim)
 dummy_input = torch.randn(1, sequence_length, feat_dim)  # Batch size 1
 
-# 5. Convert to TFLite
-class TFLiteModel(tf.Module):
-    def __init__(self, model):
-        super(TFLiteModel, self).__init__()
-        self.model = model
+# --- 6. Convert to ONNX ---
+onnx_path = "sign2text_transformer.onnx"
+convert_to_onnx(model, dummy_input, onnx_path)
 
-    @tf.function(input_signature=[tf.TensorSpec(shape=[1, sequence_length, feat_dim], dtype=tf.float32)])
-    def __call__(self, x):
-        # Convert TensorFlow tensor to PyTorch tensor
-        x = torch.from_numpy(x.numpy())
-        # Run inference with the PyTorch model's encoder
-        encoder_out = self.model.encoder(
-            src_tokens=x, encoder_padding_mask=torch.zeros(1, sequence_length).bool()
-        )
-        # Return the encoder output as a NumPy array
-        return encoder_out["encoder_out"][0].numpy()
+# --- 7. Convert to TFLite ---
+convert_to_tflite(onnx_path, output_path)
 
-# Create an instance of the TFLiteModel wrapper
-tflite_model = TFLiteModel(model)
-
-# --- 5. Convert to TFLite ---
-# Create a TFLite converter from the concrete function of the TFLiteModel
-converter = tf.lite.TFLiteConverter.from_concrete_functions(
-    [tflite_model.__call__.get_concrete_function()], tflite_model
-)
-
-# Set the inference input type to float32 explicitly
-converter.inference_input_type = tf.float32
-
-# Apply default optimizations, including quantization
-converter.optimizations = [tf.lite.Optimize.DEFAULT]
-# Convert the model
-tflite_model = converter.convert()
-
-# --- 6. Save TFLite Model ---
-# Save the converted TFLite model to a file
-with open(output_path, "wb") as f:
-    f.write(tflite_model)
-
-print(f"TFLite model saved to: {output_path}")
-
-# --- 7. Verification ---
+# --- 8. Verification ---
 # Load the TFLite model for verification
 interpreter = tf.lite.Interpreter(model_path=output_path)
 interpreter.allocate_tensors()
