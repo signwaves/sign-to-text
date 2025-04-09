@@ -6,6 +6,8 @@ from fairseq.dataclass.utils import convert_namespace_to_omegaconf
 from fairseq import checkpoint_utils, options, tasks
 import os, time
 import torch.onnx
+import onnx
+from onnx_tf.backend import prepare
 
 # Configuration
 checkpoint_path = "final_models/baseline_6_3_dp03_wd_2/ckpts/checkpoint.best_reduced_sacrebleu_3.5401.pt"  # Path to your trained PyTorch model checkpoint
@@ -54,9 +56,6 @@ def convert_to_onnx(model, dummy_input, onnx_path):
 
 # --- 4. Convert ONNX model to TFLite ---
 def convert_to_tflite(onnx_path, tflite_path):
-    import onnx
-    from onnx_tf.backend import prepare
-
     # Load ONNX model
     onnx_model = onnx.load(onnx_path)
 
