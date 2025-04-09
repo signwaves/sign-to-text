@@ -981,6 +981,25 @@ tasks:
       - "{{.SAVE_DIR}}/vocab/cvpr23.train.how2sign.unigram{{.VOCAB_SIZE}}_tokenized.model"
       - "{{.SAVE_DIR}}/vocab/cvpr23.train.how2sign.unigram{{.VOCAB_SIZE}}_tokenized.txt"
       - "{{.SAVE_DIR}}/vocab/cvpr23.train.how2sign.unigram{{.VOCAB_SIZE}}_tokenized.vocab"
+
+  how2sign:train_sentencepiece_lowercased:
+    desc: Train SentencePiece models for the How2Sign dataset, for lowercased text.
+    preconditions:
+      - sh: "[[ -d {{.FAIRSEQ_ROOT}} ]]"
+        msg: Specify the FAIRSEQ_ROOT in the .env file.
+      - sh: "[ ! -z {{.SAVE_DIR}} ]"
+        msg: Specify the SAVE_DIR in the .env file.
+      - sh: "[ ! -z {{.VOCAB_SIZE}} ]"
+        msg: Specify a VOCAB_SIZE.
+    cmds:
+      - cmd: |
+              python scripts/train_spm.py \
+                --root-path {{.FAIRSEQ_ROOT}} \
+                --save-dir {{.SAVE_DIR}} \
+                --vocab-size {{.VOCAB_SIZE}} \
+                --feats {{.FEATS}} \
+                --partition {{.PARTITION}}
+      - "{{.SAVE_DIR}}/vocab/cvpr23.train.how2sign.unigram{{.VOCAB_SIZE}}_tokenized.vocab"
   
   greet:
     cmds:
