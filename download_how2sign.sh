@@ -54,8 +54,8 @@ download_gdrive() {
     local file_id="$1"
     local output_file="$2"
     # Tunable parameters for retry mechanism
-    local max_retries=10
-    local sleep_time=15 # seconds to wait between retries
+    local max_retries=5
+    local sleep_time=5 # seconds to wait between retries
 
     local retry_count=0
 
